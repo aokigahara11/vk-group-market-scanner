@@ -10,6 +10,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
 # Добавляем корневую директорию в путь
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,30 +27,23 @@ driver = webdriver.Chrome(service=service, options=chrome_options)
 # Исполняем скрипт для маскировки под обычного пользователя
 driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-driver.get(USER)
-time.sleep(10)
- 
 def click_subscriptions():
     """
     Открывает подписки на необходимой странице
     """
     try:
         sub = driver.find_element(By.CSS_SELECTOR, "span.vkuiEllipsisText__host[title='Подписки']")
-        print(f"Нашли элемент: {sub.get_attribute('outerHTML')[:100]}")
         sub.click()
         time.sleep(5)
-        print('Кнопка "Подписки" успешно открыта!')
     except Exception as e:
         print(f"Ошибка открытия виджета: {e}")
 
-def get_all_url_subscriptions(driver):
+def get_all_url_subscriptions():
     """
     Получаем все ссылки на подписки пользователя
     """
     # Открываем "Подписки"
     click_subscriptions()
-    
-    print("Начинаем скроллинг...")
     
     # Динамический скроллинг
     last_height = driver.execute_script("return document.body.scrollHeight") 
@@ -59,9 +53,7 @@ def get_all_url_subscriptions(driver):
         new_height = driver.execute_script("return document.body.scrollHeight") 
         if new_height == last_height:
             break
-        print("Прокрутка завершена") 
         last_height = new_height
-        print("Появился новый контент, прокручиваем дальше")
     
     # Собираем все подписки
     all_links = driver.find_elements(By.CSS_SELECTOR, "a.fans_idol_lnk")
@@ -80,16 +72,12 @@ def get_all_url_subscriptions(driver):
         except:
             continue
     
-    print(f"Уникальных ссылок: {len(unique_urls)}")
-    
     # Сохраняем в .txt
-    os.makedirs("scr/data/logs", exist_ok=True)
+    os.makedirs("src/data/logs", exist_ok=True)
     
-    with open("scr/data/logs/url_subscriptions.txt", "w", encoding="utf-8") as f:
+    with open("src/data/logs/url_subscriptions.txt", "w", encoding="utf-8") as f:
         for url in unique_urls:
             f.write(url + "\n")
-    
-    print(f"Ссылки сохранены в scr/data/logs/url_subscriptions.txt")
     
     return unique_urls
 
@@ -107,95 +95,6 @@ def get_count_product():
 
     except Exception as e:
         print(f"Ошибка: {e}")
-
-def get_info_communities(link):
-    """
-    Собирает информацию о сообществе
-    """
-    info = {
-        'name': '',
-        'link': link,
-        'subscribers': 0,
-        'reviews': None
-    }
-    
-    try:
-        # Переходим на страницу сообщества
-        driver.get(link)
-        time.sleep(2)
-        
-        print(f"Собираем информацию: {link}")
-        
-        # Имя группы
-        try:
-            name_elem = driver.find_element(By.CSS_SELECTOR, "h1.page_name")
-            # Берем только текст до первого span (если есть)
-            name_text = name_elem.text
-            # Убираем возможные лишние пробелы и переводы строк
-            info['name'] = name_text.split('\n')[0].strip()
-            print(f"{info['name']}")
-        except:
-            print("Не нашли название")
-        
-        # Подписчики
-        try:
-            subscribers_elem = driver.find_element(By.CSS_SELECTOR, "span.header_count")
-            sub_text = subscribers_elem.text
-            
-            # Убираем пробелы и преобразуем в число
-            sub_text_clean = sub_text.replace(' ', '').replace('\u202f', '').replace('\xa0', '')
-            
-            try:
-                info['subscribers'] = int(sub_text_clean)
-                print(f"{info['subscribers']}")
-            except ValueError:
-                print(f" '{sub_text}' в число")
-                
-        except:
-            print("Не нашли количество подписчиков")
-        
-        # Средний балл
-        try:
-            # Ищем по data-testid
-            rating_elem = driver.find_element(By.CSS_SELECTOR, 
-                "[data-testid='rating-layout-indicator']"
-            )
-            rating_text = rating_elem.text.strip()
-            
-            # Заменяем запятую на точку для float
-            rating_text = rating_text.replace(',', '.')
-            
-            try:
-                info['reviews'] = float(rating_text)
-                print(f"{info['reviews']}")
-            except ValueError:
-                print(f"Не удалось преобразовать рейтинг '{rating_text}'")
-                
-        except:
-            # Если не нашли по data-testid, пробуем другие варианты
-            try:
-                # Ищем по классу
-                rating_elem = driver.find_element(By.CSS_SELECTOR, 
-                    ".vkitRatingLayout__indicator, [class*='rating'], [class*='Rating']"
-                )
-                rating_text = rating_elem.text.strip().replace(',', '.')
-                
-                try:
-                    info['reviews'] = float(rating_text)
-                    print(f"{info['reviews']}")
-                except:
-                    pass
-                    
-            except:
-                # Если совсем не нашли
-                print("Рейтинг не найден")
-                info['reviews'] = None
-        
-    except Exception as e:
-        print(f"❌ Ошибка при сборе информации: {e}")
-        info['error'] = str(e)
-    
-    return info
 
 def validation_product_availability():
     """
@@ -220,7 +119,7 @@ def validation_product_availability():
         print(f"Вкладка 'Товары' отсутствует: {e}")
         return False
 
-def click_show_all_products(link):
+def click_show_all_products():
     """
     Открывает кнопку товаров (Показать все)
     """
@@ -232,7 +131,6 @@ def click_show_all_products(link):
         )
 
         products_tab.click()
-        print('Перешли на вкладку "Товары"')
         time.sleep(2)
         
         # Теперь ищем кнопку "Показать все"
@@ -245,7 +143,6 @@ def click_show_all_products(link):
         
         # Кликаем
         show_all_button.click()
-        print('Кнопка "Показать все" успешно нажата!')
         
         # Ждем загрузки страницы со всеми товарами
         time.sleep(3)
@@ -253,19 +150,7 @@ def click_show_all_products(link):
     except Exception as e:
         print(f"Ошибка при нажатии кнопки 'Показать все': {e}")
 
-def save_link_communities(number):
-    """
-    Получает ссылку по номеру из файла
-
-    """
-    with open("scr/data/logs/url_subscriptions.txt", "r", encoding="utf-8") as f:
-        lines = [line.strip() for line in f if line.strip()]
-        
-        if 1 <= number <= len(lines):
-            selected_link = lines[number - 1]
-            return selected_link
-    
-def get_info_product(product_element):
+def get_info_product(element):
     """
     Извлекает основную информацию о товаре из HTML элемента
     """
@@ -279,38 +164,41 @@ def get_info_product(product_element):
     try:
         # Название товара
         try:
-            name_elem = product_element.find_element(By.CSS_SELECTOR, 
+            name_elem = element.find_element(By.CSS_SELECTOR, 
                 ".market_row_title, .product_title, .title, [class*='title'], [class*='name']"
             )
             product_info['name'] = name_elem.text.strip()
         except:
             # Пробуем найти в других местах
-            try:
-                # Иногда название в атрибуте alt у картинки
-                img_elem = product_element.find_element(By.TAG_NAME, "img")
-                product_info['name'] = img_elem.get_attribute('alt') or ''
-            except:
-                product_info['name'] = ''
+            product_info['name'] = ''
         
         # Ссылка на товар
         try:
-            link_elem = product_element.find_element(By.TAG_NAME, "a")
+            link_elem = element.find_element(By.TAG_NAME, "a")
             product_info['link'] = link_elem.get_attribute('href') or ''
         except:
             product_info['link'] = ''
 
         # Цена
         try:
-            price_elem = product_element.find_element(By.CSS_SELECTOR,
-                ".market_row_price, .product_price, .price, [class*='price'], [class*='cost']"
-            )
-            product_info['price'] = price_elem.text.strip()
+            price_elem = element.find_element(By.CSS_SELECTOR,
+                ".market_row_price:not(.market_row_price_old)"
+    )
+    
+            full_price_text = price_elem.text.strip()
+            lines = [line.strip() for line in full_price_text.split('\n') if line.strip()]
+    
+            if lines:
+                product_info['price'] = lines[0]
+            else:
+                product_info['price'] = ''
+        
         except:
             product_info['price'] = ''
 
         # Картинка
         try:
-            img_elem = product_element.find_element(By.TAG_NAME, "img")
+            img_elem = element.find_element(By.TAG_NAME, "img")
             product_info['image_url'] = img_elem.get_attribute('src') or ''
             
             # Если нет src, пробуем data-src
@@ -332,12 +220,11 @@ def download_product_image(image_url, save_path, filename=None):
     if not image_url or not image_url.startswith('http'):
         print(f"Неверный URL изображения: {image_url}")
         return None
-    
-    save_path = 'src/data/images'
 
     try:
         # Создаем папку если нет
         os.makedirs(save_path, exist_ok=True)
+        
         # Генерируем имя файла если не указано
         if not filename:
             # Берем последнюю часть URL
@@ -364,12 +251,10 @@ def download_product_image(image_url, save_path, filename=None):
         with open(filepath, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        
-        print(f"✓ Изображение сохранено: {filepath}")
+
         return filepath
         
     except Exception as e:
         print(f"✗ Ошибка скачивания изображения {image_url}: {e}")
         return None
 
-                
