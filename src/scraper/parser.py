@@ -12,10 +12,12 @@ from utils.scraper import (
     get_all_url_subscriptions,
     validation_product_availability, 
     click_show_all_products,
-    get_info_product
+    get_info_product,
+    get_count_subscriptions
 )
 from utils.image import download_product_image
 from config.user import USER
+from scraper.data.database import add_info_user, add_info_product
 
 def main_process_scraper():
     """
@@ -44,6 +46,9 @@ def main_process_scraper():
             print(f"✗ Файл {file_path} не найден")
             return
         
+        count_subscriptions = get_count_subscriptions(file_path)
+        add_info_user(USER, count_subscriptions)
+
         # 4. Читаем ссылки из файла и обрабатываем построчно
         print("\nНачинаем обработку подписок...")
         
@@ -130,19 +135,22 @@ def main_process_scraper():
                                 
                                 # Получаем информацию о товаре
                                 product_info = get_info_product(product_element)
-                                print(f"Название: {product_info.get('name', 'Не указано')}")
-                                print(f"Цена: {product_info.get('price', 'Не указана')}")
+                                
+                                name_product = product_info.get('name', '-')
+                                link_product = product_info.get('link', '-')
+                                price_product = product_info.get('price', '-')
+
+                                community_url = url
+                                community_name = "unknown"
+                                if community_url:
+                                    community_name = community_url.split('vk.com/')[-1].split('?')[0]
+
+                                add_info_product(name_product, link_product, price_product, community_name)
                                 
                                 # Скачиваем изображение если есть
                                 image_url = product_info.get('image_url')
                                 if image_url and image_url.startswith('http'):
                                     print(f"Скачиваем изображение...")
-                                    
-                                    community_url = url
-
-                                    community_name = "unknown"
-                                    if community_url:
-                                        community_name = community_url.split('vk.com/')[-1].split('?')[0]
                                         
                                     filename = f"{community_name}_{j+1}_{int(time.time())}.jpg"
            

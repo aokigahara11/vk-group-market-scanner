@@ -36,7 +36,6 @@ def get_all_url_subscriptions(driver):
     
     # Собираем все подписки
     all_links = driver.find_elements(By.CSS_SELECTOR, "a.fans_idol_lnk")
-    print(f"Найдено ссылок: {len(all_links)}")
     
     # Обрабатываем ссылки
     unique_urls = []
@@ -59,6 +58,13 @@ def get_all_url_subscriptions(driver):
             f.write(url + "\n")
     
     return unique_urls
+
+def get_count_subscriptions(filepath: str) -> int:
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return len([line for line in f if line.strip()])
+    except:
+        return 0
 
 def get_count_product(driver):
     """
