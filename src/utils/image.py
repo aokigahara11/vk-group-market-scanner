@@ -3,13 +3,14 @@ from urllib.parse import urlparse
 import os
 import requests
 import time
+from utils.logger import logger
 
 def download_product_image(image_url, save_path, filename=None):
     """
     Скачивает изображение товара и сохраняет его
     """
     if not image_url or not image_url.startswith('http'):
-        print(f"Неверный URL изображения: {image_url}")
+        logger.warning(f"Неверный URL изображения: {image_url}")
         return None
 
     try:
@@ -46,5 +47,5 @@ def download_product_image(image_url, save_path, filename=None):
         return filepath
         
     except Exception as e:
-        print(f"✗ Ошибка скачивания изображения {image_url}: {e}")
+        logger.error(f"Ошибка скачивания изображения {image_url}: {e}")
         return None

@@ -18,6 +18,8 @@ from utils.scraper import (
 from utils.image import download_product_image
 from config.user import USER
 from scraper.data.database import add_info_user, add_info_product
+from utils.logger import logger
+from utils.errors import selenium_error
 
 def main_process_scraper():
     """
@@ -28,29 +30,29 @@ def main_process_scraper():
     
     try:
         # 1. Заходим на профиль целевого пользователя
-        print("\nПереходим на профиль пользователя...")
+        logger.step("Переходим на профиль пользователя...")
         driver.get(USER)
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         
         # 2. Заходим в подписки и выгружаем URL
-        print("\nПолучаем все ссылки на подписки...")
+        logger.step("Получаем все ссылки на подписки...")
         urls = get_all_url_subscriptions(driver)
         
         if not urls:
-            print("✗ Не найдено подписок для парсинга")
+            logger.error("Не найдено подписок для парсинга")
             return
         
         # 3. Проверяем существование файла с ссылками
         file_path = "src/data/logs/url_subscriptions.txt"
         if not os.path.exists(file_path):
-            print(f"✗ Файл {file_path} не найден")
+            logger.error(f"Файл {file_path} не найден")
             return
         
         count_subscriptions = get_count_subscriptions(file_path)
         add_info_user(USER, count_subscriptions)
 
         # 4. Читаем ссылки из файла и обрабатываем построчно
-        print("\nНачинаем обработку подписок...")
+        logger.step("Начинаем обработку подписок...")
         
         with open(file_path, "r", encoding="utf-8") as f:
             urls_from_file = [line.strip() for line in f if line.strip()]
@@ -60,8 +62,8 @@ def main_process_scraper():
         total_products = 0
         
         for i, url in enumerate(urls_from_file, 1):
-            print(f"Обрабатываем ссылку {i}/{len(urls_from_file)}")
-            print(f"URL: {url}")
+            logger.step(f"Обрабатываем ссылку {i}/{len(urls_from_file)}")
+            logger.info(f"URL: {url}")
             
             try:
                 # Переходим по ссылке
@@ -70,7 +72,7 @@ def main_process_scraper():
                 wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
                 
                 # Валидация: проверяем есть ли вкладка "Товары"
-                print("Проверяем наличие товаров...")
+                logger.step("Проверяем наличие товаров...")
                 validation = validation_product_availability(driver)
                 
                 if validation:
@@ -80,7 +82,8 @@ def main_process_scraper():
                     try:
                         click_show_all_products(driver)
                     except Exception as e:
-                        print(f"Не удалось открыть все товары: {e}")
+                        error_msg = selenium_error(e)
+                        logger.error(f"Не удалось открыть все товары: {error_msg}")
                         # Пробуем продолжить сбор с текущей страницы
                     
                     # Ждем загрузки товаров
@@ -89,23 +92,23 @@ def main_process_scraper():
                             "[data-testid='market_item'], .market_item, .market_row, .product_item"
                         )))
                     except TimeoutException:
-                        print("Товары не загрузились за отведенное время")
+                        logger.warning("Товары не загрузились за отведенное время")
                         processed_count += 1
                         continue
                     
                     # Получаем количество товаров
-                    print("\nПолучаем количество товаров...")
+                    logger.info("Получаем количество товаров...")
                     product_elements = driver.find_elements(By.CSS_SELECTOR,
                         "[data-testid='market_item'], .market_item, .market_row, .product_item"
                     )
                     
                     count = len(product_elements)
-                    print(f"Найдено товаров: {count}")
+                    logger.info(f"Найдено товаров: {count}")
                     total_products += count
                     
                     if count > 0:
                         # Собираем информацию о каждом товаре
-                        print(f"\nСобираем информацию о {count} товарах...")
+                        logger.step(f"Собираем информацию о {count} товарах...")
                         
                         for j in range(count):
                             # Обновляем элементы каждый раз, так как страница может меняться
@@ -131,8 +134,6 @@ def main_process_scraper():
                                 except:
                                     pass
                                 
-                                print(f"\nТовар {j+1}/{count}")
-                                
                                 # Получаем информацию о товаре
                                 product_info = get_info_product(product_element)
                                 
@@ -150,7 +151,6 @@ def main_process_scraper():
                                 # Скачиваем изображение если есть
                                 image_url = product_info.get('image_url')
                                 if image_url and image_url.startswith('http'):
-                                    print(f"Скачиваем изображение...")
                                         
                                     filename = f"{community_name}_{j+1}_{int(time.time())}.jpg"
            
@@ -161,21 +161,19 @@ def main_process_scraper():
                                         filename=filename
                                     )
                                     
-                                else:
-                                    print("Изображение не найдено или невалидный URL")
-                                    
                             except (StaleElementReferenceException, NoSuchElementException) as e:
-                                print(f"Элемент товара {j+1} стал устаревшим или не найден, пропускаем...")
+                                logger.warning(f"Элемент товара {j+1} стал устаревшим или не найден, пропускаем...")
                                 continue
                             except Exception as e:
-                                print(f"Ошибка при обработке товара {j+1}: {e}")
+                                error_msg = selenium_error(e)
+                                logger.error(f"Ошибка при обработке товара {j+1}: {error_msg}")
                                 continue
                                 
                     else:
-                        print("Товары не найдены на странице")
+                        logger.warning("Товары не найдены на странице")
                         
                 else:
-                    print("Сообщество не имеет товаров. Пропускаем...")
+                    logger.info("Сообщество не имеет товаров. Пропускаем...")
                 
                 processed_count += 1
                 
@@ -184,17 +182,18 @@ def main_process_scraper():
                     time.sleep(1)  # Минимальная пауза
                     
             except Exception as e:
-                print(f"✗ Ошибка при обработке ссылки {url}: {e}")
+                error_msg = selenium_error(e)
+                logger.error(f"Ошибка при обработке ссылки {url}: {error_msg}")
                 continue
         
         # 5. Итоги работы
-        print("Парсинг завершен!")
-        print(f"Всего обработано: {processed_count} сообществ")
-        print(f"С товарами: {with_products_count} сообществ")
-        print(f"Всего товаров собрано: {total_products}")
+        logger.success("Парсинг завершен!")
+        logger.info(f"Всего обработано: {processed_count} сообществ")
+        logger.info(f"С товарами: {with_products_count} сообществ")
+        logger.info(f"Всего товаров собрано: {total_products}")
         
     except Exception as e:
-        print(f"\n✗ Критическая ошибка в главном процессе: {e}")
+        logger.error(f"Критическая ошибка в главном процессе: {e}")
         
     finally:
-        print("\nЗавершение работы...")
+        logger.info("Завершение работы...")

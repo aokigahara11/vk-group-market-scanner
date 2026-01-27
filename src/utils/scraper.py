@@ -5,6 +5,8 @@ import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from utils.logger import logger
+from utils.errors import selenium_error
 
 def click_subscriptions(driver):
     """
@@ -15,7 +17,8 @@ def click_subscriptions(driver):
         sub.click()
         time.sleep(5)
     except Exception as e:
-        print(f"Ошибка открытия виджета: {e}")
+        error_msg = selenium_error(e)
+        logger.error(f"Ошибка открытия виджета: {error_msg}")
 
 def get_all_url_subscriptions(driver):
     """
@@ -76,10 +79,11 @@ def get_count_product(driver):
         )
         
         if product_elements:
-            print(f"Найдено товаров: {len(product_elements)}")
+            logger.info(f"Найдено товаров: {len(product_elements)}")
 
     except Exception as e:
-        print(f"Ошибка: {e}")
+        error_msg = selenium_error(e)
+        logger.error(f"Ошибка: {error_msg}")
 
 def validation_product_availability(driver):
     """
@@ -93,15 +97,15 @@ def validation_product_availability(driver):
 
         # Если нашли 
         if button_products:
-            print("✓ Вкладка 'Товары' найдена")
+            logger.success("Вкладка 'Товары' найдена")
             return True
         else:
-            print("✗ Вкладка 'Товары' не найдена")
+            logger.info("Вкладка 'Товары' не найдена")
             return False
         
-    except Exception as e:
+    except:
         # Если не нашли ни одним способом
-        print(f"Вкладка 'Товары' отсутствует: {e}")
+        logger.info(f"Вкладка 'Товары' отсутствует")
         return False
 
 def click_show_all_products(driver):
@@ -133,7 +137,8 @@ def click_show_all_products(driver):
         time.sleep(3)
         
     except Exception as e:
-        print(f"Ошибка при нажатии кнопки 'Показать все': {e}")
+        error_msg = selenium_error(e)
+        logger.error(f"Ошибка при нажатии кнопки 'Показать все': {error_msg}")
 
 def get_info_product(element):
     """
@@ -193,7 +198,8 @@ def get_info_product(element):
             product_info['image_url'] = ''
 
     except Exception as e:
-        print(f"Ошибка извлечения информации: {e}")
+        error_msg = selenium_error(e)
+        logger.error(f"Ошибка извлечения информации: {error_msg}")
         product_info['error'] = str(e)
     
     return product_info
