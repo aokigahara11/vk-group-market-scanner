@@ -7,25 +7,22 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
-from utils.driver import init_driver
-from utils.scraper import (
-    get_all_url_subscriptions,
-    validation_product_availability, 
-    click_show_all_products,
-    get_info_product,
-    get_count_subscriptions
-)
-from utils.image import download_product_image
+from utils.driver import DriverManager
+from utils.scraper import VkScraper
+from utils.image import ImageDownloader
 from config.user import USER
 from scraper.data.database import add_info_user, add_info_product
 from utils.logger import logger
-from utils.errors import selenium_error
+from utils.errors import ErrorHandler
 
 def main_process_scraper():
     """
     Главная функция парсера товаров
     """
-    driver = init_driver()
+    scraper = VkScraper()
+    error_handler = ErrorHandler()
+    
+    driver = DriverManager.init_driver()
     wait = WebDriverWait(driver, 15)
     
     try:
@@ -36,7 +33,7 @@ def main_process_scraper():
         
         # 2. Заходим в подписки и выгружаем URL
         logger.step("Получаем все ссылки на подписки...")
-        urls = get_all_url_subscriptions(driver)
+        urls = scraper.get_all_url_subscriptions(driver)
         
         if not urls:
             logger.error("Не найдено подписок для парсинга")
@@ -48,7 +45,7 @@ def main_process_scraper():
             logger.error(f"Файл {file_path} не найден")
             return
         
-        count_subscriptions = get_count_subscriptions(file_path)
+        count_subscriptions = VkScraper.get_count_subscriptions(file_path)
         add_info_user(USER, count_subscriptions)
 
         # 4. Читаем ссылки из файла и обрабатываем построчно
@@ -73,16 +70,16 @@ def main_process_scraper():
                 
                 # Валидация: проверяем есть ли вкладка "Товары"
                 logger.step("Проверяем наличие товаров...")
-                validation = validation_product_availability(driver)
+                validation = scraper.validation_product_availability(driver)
                 
                 if validation:
                     with_products_count += 1
                     
                     # Нажимаем "Показать все" товары
                     try:
-                        click_show_all_products(driver)
+                        scraper.click_show_all_products(driver)
                     except Exception as e:
-                        error_msg = selenium_error(e)
+                        error_msg = error_handler.selenium_error(e)
                         logger.error(f"Не удалось открыть все товары: {error_msg}")
                         # Пробуем продолжить сбор с текущей страницы
                     
@@ -135,7 +132,7 @@ def main_process_scraper():
                                     pass
                                 
                                 # Получаем информацию о товаре
-                                product_info = get_info_product(product_element)
+                                product_info = scraper.get_info_product(product_element)
                                 
                                 name_product = product_info.get('name', '-')
                                 link_product = product_info.get('link', '-')
@@ -155,7 +152,7 @@ def main_process_scraper():
                                     filename = f"{community_name}_{j+1}_{int(time.time())}.jpg"
            
                                     # 3. Вызываем функцию с корректными параметрами
-                                    download_product_image(
+                                    ImageDownloader.download_product_image(
                                         image_url=image_url,
                                         save_path="src/data/images",
                                         filename=filename
@@ -165,7 +162,7 @@ def main_process_scraper():
                                 logger.warning(f"Элемент товара {j+1} стал устаревшим или не найден, пропускаем...")
                                 continue
                             except Exception as e:
-                                error_msg = selenium_error(e)
+                                error_msg = error_handler.selenium_error(e)
                                 logger.error(f"Ошибка при обработке товара {j+1}: {error_msg}")
                                 continue
                                 
@@ -182,7 +179,7 @@ def main_process_scraper():
                     time.sleep(1)  # Минимальная пауза
                     
             except Exception as e:
-                error_msg = selenium_error(e)
+                error_msg = error_handler.selenium_error(e)
                 logger.error(f"Ошибка при обработке ссылки {url}: {error_msg}")
                 continue
         
