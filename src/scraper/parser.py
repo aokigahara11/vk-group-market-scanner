@@ -143,13 +143,13 @@ def main_process_scraper():
                                 if community_url:
                                     community_name = community_url.split('vk.com/')[-1].split('?')[0]
 
-                                add_info_product(name_product, link_product, price_product, community_name)
+                                product_id = add_info_product(name_product, link_product, price_product, community_name)
                                 
                                 # Скачиваем изображение если есть
                                 image_url = product_info.get('image_url')
                                 if image_url and image_url.startswith('http'):
                                         
-                                    filename = f"{community_name}_{j+1}_{int(time.time())}.jpg"
+                                    filename = f"{product_id}.jpg"
            
                                     # 3. Вызываем функцию с корректными параметрами
                                     ImageDownloader.download_product_image(

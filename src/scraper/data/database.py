@@ -43,7 +43,6 @@ def init_database_products():
     """Инициализирует таблицу товаров"""
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             link TEXT UNIQUE,
             price INTEGER,
@@ -60,7 +59,7 @@ def add_info_product(name, link, price, community):
             VALUES (?, ?, ?, ?)
         ''', (name, link, price, community))
         connect.commit()
-        return True
+        return cursor.lastrowid
     except sqlite3.Error as e:
         print(f"Ошибка при добавлении товара: {e}")
-        return False
+        return None

@@ -1,8 +1,6 @@
 # utils/image.py
-from urllib.parse import urlparse
 import os
 import requests
-import time
 from utils.logger import logger
 
 class ImageDownloader:
@@ -18,17 +16,6 @@ class ImageDownloader:
         try:
             # Создаем папку если нет
             os.makedirs(save_path, exist_ok=True)
-            
-            # Генерируем имя файла если не указано
-            if not filename:
-                # Берем последнюю часть URL
-                parsed_url = urlparse(image_url)
-                url_path = parsed_url.path
-                filename = os.path.basename(url_path)
-                
-                # Если нет расширения, добавляем .jpg
-                if not filename or '.' not in filename:
-                    filename = f"product_{int(time.time())}.jpg"
             
             # Полный путь к файлу
             filepath = os.path.join(save_path, filename)
