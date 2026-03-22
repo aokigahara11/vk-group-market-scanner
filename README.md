@@ -68,8 +68,7 @@ src/
 ├── scraper/
 │   ├── parser.py           # Основной парсер
 │   └── data/
-│       ├── database.py     # Работа с БД
-│       └── storage.py      # Хранение данных
+│       └── database.py     # Работа с БД
 ├── tests/                  # Тесты
 └── utils/                  # Утилиты
     ├── driver.py           # Инициализация драйвера
