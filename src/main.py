@@ -1,8 +1,6 @@
 # main.py
-from scraper.parser import main_process_scraper
-from scraper.data.database import init_database_user, init_database_products
+from vk_market_scanner import VkMarketScanner
 
 if __name__ == '__main__':
-    init_database_user()
-    init_database_products()
-    main_process_scraper()
+    scanner = VkMarketScanner()
+    scanner.run()

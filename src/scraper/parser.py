@@ -11,7 +11,7 @@ from utils.driver import DriverManager
 from utils.scraper import VkScraper
 from utils.image import ImageDownloader
 from config.user import USER
-from scraper.data.database import add_info_user, add_info_product
+from database.database import add_info_user, add_info_product
 from utils.logger import logger
 from utils.errors import ErrorHandler
 
