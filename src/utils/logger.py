@@ -1,6 +1,7 @@
 # utils/logger.py
 import os
 from datetime import datetime
+from pathlib import Path
 from rich.console import Console
 from rich.theme import Theme
 
@@ -17,13 +18,14 @@ class Logger:
         }))
         
         # Автоматически создаем лог-файл
-        self.log_file = "src/data/logs/logs.txt"
+        data_dir = Path(__file__).resolve().parents[2] / "data"
+        self.log_file = str(data_dir / "logs" / "logs.txt")
         self._init_log_file()
     
     def _init_log_file(self):
         """Создает файл и пишет начало работы"""
         try:
-            os.makedirs("src/data/logs", exist_ok=True)
+            os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(f"\nНачало работы скрипта: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         except:

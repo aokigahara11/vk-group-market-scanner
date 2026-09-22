@@ -1,16 +1,39 @@
 # utils/scraper.py
 import os
 import time
+from pathlib import Path
+import requests
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from utils.logger import logger
-from utils.errors import ErrorHandler
+from src.utils.logger import logger
+from src.utils.errors import ErrorHandler
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from src.config.setting import default_chrome_settings
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 class VkScraper:
     def __init__(self):
         self.error_handler = ErrorHandler()
+
+    @staticmethod
+    def init_driver():
+        """Инициализирует и возвращает драйвер"""
+        chrome_options = default_chrome_settings.get_options()
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        return driver
+    
+    @staticmethod
+    def close_driver(driver):
+        """Закрывает драйвер"""
+        if driver:
+            driver.quit()
 
     def click_subscriptions(self, driver):
         """
@@ -58,9 +81,10 @@ class VkScraper:
                 continue
         
         # Сохраняем в .txt
-        os.makedirs("src/data/logs", exist_ok=True)
+        log_dir = DATA_DIR / "logs"
+        os.makedirs(log_dir, exist_ok=True)
         
-        with open("src/data/logs/url_subscriptions.txt", "w", encoding="utf-8") as f:
+        with open(log_dir / "url_subscriptions.txt", "w", encoding="utf-8") as f:
             for url in unique_urls:
                 f.write(url + "\n")
         
@@ -144,6 +168,40 @@ class VkScraper:
         except Exception as e:
             error_msg = self.error_handler.selenium_error(e)
             logger.error(f"Ошибка при нажатии кнопки 'Показать все': {error_msg}")
+
+    def download_product_image(image_url, save_path, filename=None):
+            """
+            Скачивает изображение товара и сохраняет его
+            """
+            if not image_url or not image_url.startswith('http'):
+                logger.warning(f"Неверный URL изображения: {image_url}")
+                return None
+    
+            try:
+                # Создаем папку если нет
+                os.makedirs(save_path, exist_ok=True)
+                
+                # Полный путь к файлу
+                filepath = os.path.join(save_path, filename)
+                
+                # Скачиваем изображение
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                
+                response = requests.get(image_url, headers=headers, stream=True, timeout=10)
+                response.raise_for_status()
+                
+                # Сохраняем файл
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+    
+                return filepath
+                
+            except Exception as e:
+                logger.error(f"Ошибка скачивания изображения {image_url}: {e}")
+            return None
 
     def get_info_product(self, element):
         """

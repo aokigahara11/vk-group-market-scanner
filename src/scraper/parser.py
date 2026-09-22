@@ -1,19 +1,21 @@
 # scraper/parser.py
 import os
 import time
+from pathlib import Path
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
-from utils.driver import DriverManager
-from utils.scraper import VkScraper
-from utils.image import ImageDownloader
-from config.user import USER
-from database.database import add_info_user, add_info_product
-from utils.logger import logger
-from utils.errors import ErrorHandler
+from src.utils.scraper import VkScraper
+from src.config.user import USER
+from database.user import DatabaseUser
+from database.product import DatabaseProducts
+from src.utils.logger import logger
+from src.utils.errors import ErrorHandler
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 def main_process_scraper():
     """
@@ -22,7 +24,7 @@ def main_process_scraper():
     scraper = VkScraper()
     error_handler = ErrorHandler()
     
-    driver = DriverManager.init_driver()
+    driver = VkScraper.init_driver()
     wait = WebDriverWait(driver, 15)
     
     try:
@@ -40,13 +42,13 @@ def main_process_scraper():
             return
         
         # 3. Проверяем существование файла с ссылками
-        file_path = "src/data/logs/url_subscriptions.txt"
+        file_path = DATA_DIR / "logs" / "url_subscriptions.txt"
         if not os.path.exists(file_path):
             logger.error(f"Файл {file_path} не найден")
             return
         
         count_subscriptions = VkScraper.get_count_subscriptions(file_path)
-        add_info_user(USER, count_subscriptions)
+        DatabaseUser.add_info_user(USER, count_subscriptions)
 
         # 4. Читаем ссылки из файла и обрабатываем построчно
         logger.step("Начинаем обработку подписок...")
@@ -143,7 +145,7 @@ def main_process_scraper():
                                 if community_url:
                                     community_name = community_url.split('vk.com/')[-1].split('?')[0]
 
-                                product_id = add_info_product(name_product, link_product, price_product, community_name)
+                                product_id = DatabaseProducts.add_info_product(name_product, link_product, price_product, community_name)
                                 
                                 # Скачиваем изображение если есть
                                 image_url = product_info.get('image_url')
@@ -152,9 +154,9 @@ def main_process_scraper():
                                     filename = f"{product_id}.jpg"
            
                                     # 3. Вызываем функцию с корректными параметрами
-                                    ImageDownloader.download_product_image(
+                                    VkScraper.download_product_image(
                                         image_url=image_url,
-                                        save_path="src/data/images",
+                                        save_path=str(DATA_DIR / "images"),
                                         filename=filename
                                     )
                                     
