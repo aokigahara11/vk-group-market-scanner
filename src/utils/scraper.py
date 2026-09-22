@@ -3,6 +3,7 @@ import os
 import time
 from pathlib import Path
 import requests
+import json
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,8 +18,10 @@ from src.config.setting import default_chrome_settings
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 class VkScraper:
+    """Сборник функций для парсинга"""
     def __init__(self):
         self.error_handler = ErrorHandler()
+        self.driver = self.init_driver()
 
     @staticmethod
     def init_driver():
@@ -29,43 +32,43 @@ class VkScraper:
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         return driver
     
-    @staticmethod
-    def close_driver(driver):
+    def close_driver(self):
         """Закрывает драйвер"""
-        if driver:
-            driver.quit()
+        if self.driver:
+            self.driver.quit()
+            self.driver = None
 
-    def click_subscriptions(self, driver):
+    def click_subscriptions(self):
         """
         Открывает подписки на необходимой странице
         """
         try:
-            sub = driver.find_element(By.CSS_SELECTOR, "span.vkuiEllipsisText__host[title='Подписки']")
+            sub = self.driver.find_element(By.CSS_SELECTOR, "span.vkuiEllipsisText__host[title='Подписки']")
             sub.click()
             time.sleep(5)
         except Exception as e:
             error_msg = self.error_handler.selenium_error(e)
             logger.error(f"Ошибка открытия виджета: {error_msg}")
 
-    def get_all_url_subscriptions(self, driver):
+    def get_all_url_subscriptions(self):
         """
         Получаем все ссылки на подписки пользователя
         """
         # Открываем "Подписки"
-        self.click_subscriptions(driver)
+        self.click_subscriptions()
         
         # Динамический скроллинг
-        last_height = driver.execute_script("return document.body.scrollHeight") 
+        last_height = self.driver.execute_script("return document.body.scrollHeight")
         while True: 
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);") 
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2) 
-            new_height = driver.execute_script("return document.body.scrollHeight") 
+            new_height = self.driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
             last_height = new_height
         
         # Собираем все подписки
-        all_links = driver.find_elements(By.CSS_SELECTOR, "a.fans_idol_lnk")
+        all_links = self.driver.find_elements(By.CSS_SELECTOR, "a.fans_idol_lnk")
         
         # Обрабатываем ссылки
         unique_urls = []
@@ -98,12 +101,12 @@ class VkScraper:
         except:
             return 0
 
-    def get_count_product(self, driver):
+    def get_count_product(self):
         """
         Получаем количество товаров
         """
         try:
-            product_elements = driver.find_elements(By.CSS_SELECTOR, 
+            product_elements = self.driver.find_elements(By.CSS_SELECTOR,
                 "[data-testid='market_item']"
             )
             
@@ -114,13 +117,13 @@ class VkScraper:
             error_msg = self.error_handler.selenium_error(e)
             logger.error(f"Ошибка: {error_msg}")
 
-    def validation_product_availability(self, driver):
+    def validation_product_availability(self):
         """
         Валидация URL, сообщество ли это и есть ли там товары
         Возвращает True если есть вкладка "Товары"
         """
         try:
-            button_products = driver.find_element(By.CSS_SELECTOR, 
+            button_products = self.driver.find_element(By.CSS_SELECTOR,
                 "[data-testid='tab_content_market'], [data-testid*='market']"
             )
 
@@ -137,13 +140,13 @@ class VkScraper:
             logger.info(f"Вкладка 'Товары' отсутствует")
             return False
 
-    def click_show_all_products(self, driver):
+    def click_show_all_products(self):
         """
         Открывает кнопку товаров (Показать все)
         """
         try:
             # Ждем и кликаем на вкладку "Товары"
-            wait = WebDriverWait(driver, 15)
+            wait = WebDriverWait(self.driver, 15)
             products_tab = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-tab="market"]'))
             )
@@ -156,7 +159,7 @@ class VkScraper:
             EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-testid="groups_tabs_content_button_all"]')))
             
             # Прокручиваем к кнопке если нужно
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", show_all_button)
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", show_all_button)
             time.sleep(0.5)
             
             # Кликаем

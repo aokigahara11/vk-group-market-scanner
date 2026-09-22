@@ -23,9 +23,8 @@ def main_process_scraper():
     """
     scraper = VkScraper()
     error_handler = ErrorHandler()
-    
-    driver = VkScraper.init_driver()
-    wait = WebDriverWait(driver, 15)
+    driver = scraper.driver
+    wait = WebDriverWait(scraper.driver, 15)
     
     try:
         # 1. Заходим на профиль целевого пользователя
@@ -35,7 +34,7 @@ def main_process_scraper():
         
         # 2. Заходим в подписки и выгружаем URL
         logger.step("Получаем все ссылки на подписки...")
-        urls = scraper.get_all_url_subscriptions(driver)
+        urls = scraper.get_all_url_subscriptions()
         
         if not urls:
             logger.error("Не найдено подписок для парсинга")
@@ -72,14 +71,14 @@ def main_process_scraper():
                 
                 # Валидация: проверяем есть ли вкладка "Товары"
                 logger.step("Проверяем наличие товаров...")
-                validation = scraper.validation_product_availability(driver)
+                validation = scraper.validation_product_availability()
                 
                 if validation:
                     with_products_count += 1
                     
                     # Нажимаем "Показать все" товары
                     try:
-                        scraper.click_show_all_products(driver)
+                        scraper.click_show_all_products()
                     except Exception as e:
                         error_msg = error_handler.selenium_error(e)
                         logger.error(f"Не удалось открыть все товары: {error_msg}")
@@ -196,3 +195,4 @@ def main_process_scraper():
         
     finally:
         logger.info("Завершение работы...")
+        scraper.close_driver()
