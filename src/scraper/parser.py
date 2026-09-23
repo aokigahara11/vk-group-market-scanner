@@ -8,7 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
-from src.utils.scraper import VkScraper
+from src.utils.scraper import VkScraper, CookieManager
 from src.config.user import USER
 from database.user import DatabaseUser
 from database.product import DatabaseProducts
@@ -27,6 +27,9 @@ def main_process_scraper():
     wait = WebDriverWait(scraper.driver, 15)
     
     try:
+        cookie_manager = CookieManager(driver)
+        cookie_manager.ensure_authenticated()
+
         # 1. Заходим на профиль целевого пользователя
         logger.step("Переходим на профиль пользователя...")
         driver.get(USER)
@@ -142,7 +145,7 @@ def main_process_scraper():
                                 community_url = url
                                 community_name = "unknown"
                                 if community_url:
-                                    community_name = community_url.split('vk.com/')[-1].split('?')[0]
+                                    community_name = community_url.split('vk.ru/')[-1].split('?')[0]
 
                                 product_id = DatabaseProducts.add_info_product(name_product, link_product, price_product, community_name)
                                 

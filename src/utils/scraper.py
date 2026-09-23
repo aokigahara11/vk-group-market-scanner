@@ -16,9 +16,114 @@ from webdriver_manager.chrome import ChromeDriverManager
 from src.config.setting import default_chrome_settings
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+COOKIES_PATH = DATA_DIR / "cookies.json"
 
+class CookieManager:
+    """Управление авторизацией и сессионными куками VK"""
+    def __init__(self, driver, cookies_file: Path = COOKIES_PATH):
+        self.driver = driver
+        self.cookies_file = cookies_file
+
+    def has_cookies(self) -> bool:
+        """Проверяет наличие файла с куками"""
+        return self.cookies_file.exists() and self.cookies_file.stat().st_size > 0
+
+    def save_cookies(self):
+        """Интерактивный вход и сохранение куки в JSON"""
+        logger.warning("Файл с куки не найден или пуст.")
+        logger.info("Пожалуйста, авторизуйтесь в открывшемся окне браузера...")
+
+        input("[ACTION] После успешной авторизации в VK нажмите ENTER в этой консоли...")
+
+        os.makedirs(self.cookies_file.parent, exist_ok=True)
+        cookies = self.driver.get_cookies()
+
+        with open(self.cookies_file, "w", encoding="utf-8") as f:
+            json.dump(cookies, f, ensure_ascii=False, indent=4)
+
+        logger.success(f"Куки успешно сохранены в: {self.cookies_file}")
+
+    def is_authenticated(self, timeout=10):
+        """Проверяет, что VK показывает элементы авторизованного пользователя."""
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR,
+                    "#l_pr, [data-testid='header_avatar'], .TopNavBtn, #myprofile_wrap"
+                ))
+            )
+            return True
+        except Exception:
+            return False
+
+    def load_cookies(self):
+        """Подгрузка куки из файла в текущую сессию браузера"""
+        if not self.has_cookies():
+            logger.error("Нельзя загрузить куки: файл не существует!")
+            return False
+
+        logger.info("Загружаем сохраненные куки...")
+
+        if "vk.ru" not in self.driver.current_url:
+            self.driver.get("https://vk.ru")
+
+        with open(self.cookies_file, "r", encoding="utf-8") as f:
+            cookies = json.load(f)
+
+        loaded_count = 0
+        skipped_count = 0
+        for cookie in cookies:
+            if "expiry" in cookie:
+                cookie["expiry"] = int(cookie["expiry"])
+                if cookie["expiry"] <= int(time.time()):
+                    skipped_count += 1
+                    continue
+            try:
+                self.driver.add_cookie(cookie)
+                loaded_count += 1
+            except Exception as error:
+                skipped_count += 1
+                logger.warning(
+                    f"Не удалось добавить cookie {cookie.get('name')}: {error}"
+                )
+
+        if loaded_count == 0:
+            logger.warning("Ни одна cookie не была добавлена.")
+            return False
+
+        logger.success(
+            f"Добавлено cookies: {loaded_count}, пропущено: {skipped_count}. Обновляем сессию..."
+        )
+        self.driver.refresh()
+
+        if self.is_authenticated():
+            logger.success("Авторизация по кукам успешно подтверждена!")
+            return True
+
+        logger.warning("Сессия по кукам не подтвердилась, cookies устарели или неполны.")
+        return False
+
+    def ensure_authenticated(self):
+        """
+        Проверяет авторизацию, подгружает куки
+        или запрашивает ручной вход, если кук нет.
+        """
+        # Сначала обязательно заходим на базовый домен VK
+        self.driver.get("https://vk.ru")
+
+        if self.is_authenticated():
+            logger.success("Авторизация восстановлена из постоянного профиля Chrome.")
+            return True
+
+        if self.has_cookies() and self.load_cookies():
+            return True
+
+        logger.warning("Автоматическая авторизация не удалась. Требуется ручной вход.")
+        self.save_cookies()
+        return self.is_authenticated()
+    
 class VkScraper:
-    """Сборник функций для парсинга"""
+    """Сборник функций для процесса парсинга"""
     def __init__(self):
         self.error_handler = ErrorHandler()
         self.driver = self.init_driver()
